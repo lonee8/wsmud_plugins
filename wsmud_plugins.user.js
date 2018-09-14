@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.1
+// @version      1.0.2
 // @date         01/07/2018
-// @modified     09/09/2018
+// @modified     14/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -1997,7 +1997,7 @@ color: unset;resize: none;width: 80%;height: 1rem;margin-bottom: 0px;padding: 0p
     unsafeWindow.G = G;
     unsafeWindow.S = S;
 
-    window.addEventListener("load", function () {
+    $(document).ready(function () {
         KEY.init();
         WG.init();
         $("head").append("<link href='https://cdn.bootcss.com/jquery-contextmenu/3.0.0-beta.2/jquery.contextMenu.min.css' rel='stylesheet'>");
