@@ -211,7 +211,6 @@
         unsafeWindow.send_cmd = send_cmd;
         unsafeWindow.cmd_echo=cmd_echo;
         unsafeWindow.test = my_receive_message;
-        console.log(2);
     }
     else
     {
