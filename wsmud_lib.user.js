@@ -213,15 +213,9 @@
     }
     else {
         console.log("武神传说websocket捕获失败！");
-<<<<<<< HEAD
         if (document.body) {
             document.getElementsByClassName("signinfo")[0].innerHTML = "<HIR>使用yandex浏览器请油猴设置为高级，实验-注入模式设置为严格</HIR>";
             setTimeout(() => { location.reload(); }, 2000);
-=======
-        if(document.body)
-        {
-            document.getElementsByClassName("signinfo")[0].innerHTML="<HIR>使用yandex浏览器请油猴设置为高级，实验-注入模式设置为严格</HIR>"
->>>>>>> e3f90f61e721df8ddbcbdaff03b7b91f5c93d87f
         }
     }
 })();
