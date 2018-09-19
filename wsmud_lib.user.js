@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_lib
 // @namespace    cqv
-// @version      0.0.3
+// @version      0.0.5
 // @date         8/08/2018
-// @modified     14/08/2018
+// @modified     19/08/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/371517
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -218,8 +218,6 @@
         if(document.body)
         {
             document.getElementsByClassName("signinfo")[0].innerHTML="<HIR>使用yandex浏览器请油猴设置为高级，实验-注入模式设置为严格</HIR>"
-       setTimeout(() => {
-                location.reload();
-            },2000); }
         }
+    }
 })();
