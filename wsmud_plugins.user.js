@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.2
+// @version      1.0.3
 // @date         01/07/2018
-// @modified     14/09/2018
+// @modified     19/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -470,6 +470,7 @@
         stat_xiyan_find: 0,
         cooldowns: new Map(),
         in_fight: false,
+        auto_preform: true,
     };
 
     var WG = {
@@ -477,7 +478,7 @@
         sm_item: null,
 
         init: function () {
-            add_listener(["login", "room", "items", "itemadd", "itemremove", "sc", "state", "msg", "perform", "dispfm", "combat"], function (data) {
+            add_listener(["login", "room", "items", "itemadd", "itemremove", "sc", "text", "state", "msg", "perform", "dispfm", "combat"], function (data) {
                 if (data.type == "login") {
                     G.id = data.id;
                     WG.login(); WG.setting.load(data.setting);
@@ -505,7 +506,7 @@
                                 n = n.substr(i + 1).replace(/<.*>/g, '');
                             }
 
-                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp });
+                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp, damage: 0 });
                         }
 
                     }
@@ -525,7 +526,7 @@
                             }
                             n = n.substr(i + 1).replace(/<.*>/g, '');
                         }
-                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp });
+                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp, damage: 0 });
                     }
                     WG.show_hp(data.id);
                 }
@@ -537,6 +538,22 @@
                         let item = G.items.get(data.id);
                         item.hp = data.hp;
                         WG.show_hp(data.id);
+                        if (data.id != G.id) {
+                            G.scid = data.id;    //伤害统计需要
+                        }
+                    }
+                }
+                else if (data.type == "text") {
+                    if (G.in_fight) {
+                        let text = $.trim($('<body>' + data.msg + '</body>').text());
+                        let r = text.match(/造成(\d+)点(伤害|暴击伤害)/);
+                        if (r) {
+                            let item = G.items.get(G.scid);
+                            if (item) {
+                                item.damage += parseInt(r[1]);
+                                WG.show_DPS(G.scid, item);
+                            }
+                        }
                     }
                 }
                 else if (data.type == "state") {
@@ -587,10 +604,18 @@
 
                 }
                 else if (data.type == "combat") {
-                    if (data.start) G.in_fight = true;
-                    if (data.end) G.in_fight = false;
+                    if (data.start) {
+                        G.in_fight = true;
+                        WG.auto_preform();
+                    }
+                    if (data.end) {
+                        G.in_fight = false;
+                        if (G.preform_timer) {
+                            clearInterval(G.preform_timer);
+                            G.preform_timer = undefined;
+                        }
+                    }
                 }
-
             });
             add_listener("dialog", function (data) {
                 if (data.dialog == "score") {
@@ -610,12 +635,13 @@
             if ($(".WG_log").length == 0) {
                 var html = `
                 <div class="WG_log"><pre></pre></div>
-                <div>
+                <div style=" width: calc(100% - 40px);">
                 <span class="zdy-item eq1">未设置</span>
                 <span class="zdy-item eq2">未设置</span>
                 <span class="zdy-item eq3">未设置</span>
+                <span class="zdy-item auto_perform" style="float:right;">自动攻击</span>
                 </div>
-                <div>
+                <div style=" width: calc(100% - 40px);">
                 <span class="zdy-item sm_button">师门(Q)</span>
                 <span class="zdy-item ym_button">追捕(W)</span>
                 <span class="zdy-item kill_all">击杀(E)</span>
@@ -632,6 +658,7 @@
                 .WG_log{flex: 1;overflow-y: auto;border: 1px solid #404000;max-height: 10em;width: calc(100% - 40px);}
                 .WG_log > pre{margin: 0px; white-space: pre-line;}
                 .item-hp{display: inline-block;float: right;width: 100px;}
+                .item-dps{display: inline-block;float: right;width: 100px;}
                 `;
                 GM_addStyle(css);
                 $(".sm_button").on("click", WG.sm);
@@ -640,6 +667,8 @@
                 $(".get_all").on("click", WG.get_all);
                 $(".packup").on("click", WG.packup);
                 $(".zdwk").on("click", WG.zdwk);
+                $(".auto_perform").on("click", WG.auto_preform_switch);
+
                 $(".eq1").on("click", function () { if (G.eq1) { send_cmd(G.eq1); } else { messageAppend("未设置"); } });
                 $(".eq2").on("click", function () { if (G.eq2) { send_cmd(G.eq2); } else { messageAppend("未设置"); } });
                 $(".eq3").on("click", function () { if (G.eq3) { send_cmd(G.eq3); } else { messageAppend("未设置"); } });
@@ -664,29 +693,26 @@
                         if (s.length == 0) {
                             s = $(".room-item[itemid=" + id + "] .item-status").after("<span class='item-hp'></span>").next();
                         }
-                        if (v.hp != undefined) {
-                            s.html("<hij>HP:" + v.hp + "(" + Math.floor(v.hp / v.max_hp * 100) + "%)</hij>");
-                        }
-                        else {
-                            s.html("");
-                        }
-                    } else {
+                        let html = "";
+                        if (v.hp != undefined) html += "<hij>HP:" + v.hp + "(" + Math.floor(v.hp / v.max_hp * 100) + "%)</hij>";
+                        s.html(html);
+                    }
+                    else {
                         $(".room-item[itemid=" + id + "] .item-hp").remove();
                     }
 
                     return;
+
                 }
                 for (let [k, v] of G.items) {
                     let s = $(".room-item[itemid=" + k + "] .item-hp");
                     if (s.length == 0) {
                         s = $(".room-item[itemid=" + k + "] .item-status").after("<span class='item-hp'></span>").next();
                     }
-                    if (v.hp != undefined) {
-                        s.html("<hij>HP:" + v.hp + "(" + Math.floor(v.hp / v.max_hp * 100) + "%)</hij>");
-                    }
-                    else {
-                        s.html("");
-                    }
+                    let html = "";
+                    if (v.hp != undefined) html += "<hij>HP:" + v.hp + "(" + Math.floor(v.hp / v.max_hp * 100) + "%)</hij>";
+
+                    s.html(html);
                 }
             }
             else {
@@ -694,9 +720,18 @@
                     $(".item-hp").remove();
                     G.has_item_hp = false;
                 }
-
             }
-
+        },
+        show_DPS: function (id, item) {
+            console.log(item);
+            let s = $(".room-item[itemid=" + id + "] .item-dps");
+            if (s.length == 0) {
+                s = $(".room-item[itemid=" + id + "] .item-status").after("<span class='item-dps'></span>").next();
+            }
+            console.log(s);
+            let html = "";
+            if (item.damage) html = "<hir>DPS:" + item.damage + "(" + Math.floor(item.damage / item.max_hp * 100) + "%)</hir>";
+            s.html(html);
         },
         todo: function (fn) {
             var h = add_listener('text', function (data) {
@@ -822,6 +857,10 @@
                                     }, 500);
                                 }
                             }
+                        }
+                        if (data.type == 'dialog' && data.dialog == 'pack') {
+                            //自动服用培元，养精
+                            if ((/培元丹|养精丹/).test(data.name)) send_cmd("use " + data.id);
                         }
                         break;
                     case 1: //背包搜索
@@ -1006,7 +1045,9 @@
             else {
                 paths = [];
             }
-            G.kill_listener = add_listener(['sc', 'combat', 'dispfm', 'status', 'die', 'text', 'msg', "dialog"], function (data) {
+            //清除火龙王等标红
+            boss_name = $.trim($('<body>' + boss_name + '</body>').text());
+            G.kill_listener = add_listener(['sc', 'dispfm', 'status', 'die', 'text', 'msg', "dialog", "itemremove"], function (data) {
                 if (state == 1 && data.type == 'text' && data.msg == '你要看什么？') {
                     var id = WG.find_item(boss_name);
                     if (id) {
@@ -1044,6 +1085,12 @@
                         state = 3;
                     }
                 } else if (state == 2 && data.type == 'sc' && data.id == boss_id) {
+                    //检测boss血量
+                    let item = G.items.get(data.id);
+                    //血量低于0.95强制立马攻击
+                    if (item.hp / item.max_hp < 0.95) {
+                        send_cmd("kill " + boss_id); state = 3; return;
+                    }
                     setTimeout(function () {
                         var t = kill_time - new Date().getTime();
                         if (t <= 0) {
@@ -1077,18 +1124,18 @@
                     //自身状态
                 } else if (state == 3 && data.type == 'status' && data.id == boss_id && data.action == 'remove') {
                     //boss状态
-                } else if (state == 3 && data.type == 'combat') {
-                    if (data.start) {
-                        WG.auto_preform();
+                } else if ((state == 2 || state == 3) && data.type == 'itemremove' && data.id == boss_id) {
+                    if (G.in_fight) {
+                        //修正BOSS战斗不结束
+                        test({ data: '{type:"combat",end:1}' });
                     }
-                    if (data.end) {
-                        messageAppend("<hio>世界BOSS</hio>击杀BOSS完成");
-                        G.stat_boss_success++;
-                        setTimeout(function () {
-                            WG.boss("stop");
-                            state = 0;
-                        }, 5000);
-                    }
+                    messageAppend("<hio>世界BOSS</hio>击杀BOSS完成");
+                    G.stat_boss_success++;
+                    setTimeout(function () {
+                        WG.boss("stop");
+                        state = 0;
+                    }, 5000);
+
                 } else if (state == 3 && data.type == 'dialog' && data.dialog == 'pack') {
                     if (/^<wht>.+<\/wht>$/.test(data.name)) {
                         send_cmd('drop ' + data.id);
@@ -1176,7 +1223,7 @@
                 }
             };
 
-            G.ym_listener = add_listener(["text", "dialog", "items", "status", "status", "combat", "die"], (data) => {
+            G.ym_listener = add_listener(["text", "dialog", "items", "status", "status", "die"], (data) => {
                 switch (state) {
                     case 0://任务判断
                         if (data.type == 'dialog' && data.dialog == 'tasks') {
@@ -1192,7 +1239,7 @@
                             if (r) {
                                 ym_cnt = parseInt(r[2]) + 1;
                                 if (ym_cnt > 20) { WG.yamen("stop"); }
-                                else if (r[3] > S.yamen_max) { task_ym(true); }
+                                else if (parseInt(r[3]) > parseInt(S.yamen_max)) { task_ym(true); }
                                 else {
                                     r = r[1].match(/^(.+)，据说最近在(.+)出现过，你还有.+去寻找他，$/);
                                     if (r) {
@@ -1263,10 +1310,7 @@
                         }
                         break;
                     case 3: //战斗处理
-                        if (data.type == "combat") {
-                            if (data.start) WG.auto_preform();
-                        }
-                        else if (data.type == 'status' && data.id == G.id && data.action == 'remove') {
+                        if (data.type == 'status' && data.id == G.id && data.action == 'remove') {
                             //自身状态
                         } else if (data.type == 'status' && data.id == ym_target_id && data.action == 'remove') {
                             //boss状态
@@ -1509,7 +1553,7 @@
                             }
                         }
                     }
-                } else if (data.type == 'msg' && data.ch == 'sys' && !G.xiulian_now) {
+                } else if (data.type == 'msg' && data.ch == 'sys' && G.map == "home " && !G.xiulian_now) {
                     let r = data.content.match(/^(.+)捡到一本挖矿指南，学会了里面记载的挖矿技巧，所有人的挖矿效率都提高了。$/);
                     if (G.xl_skills.length && r) {
                         //挖矿指南，前往挖矿
@@ -1672,7 +1716,7 @@
             } else {
                 messageAppend("<hio>自动武道</hio>武道设置参数错误，应为数字,数字(10,30)"); return;
             }
-            G.wd_linstener = add_listener(["items", "text", "combat"], (data) => {
+            G.wd_linstener = add_listener(["items", "text",], (data) => {
                 if (data.type == "items") {
                     let r = G.room_name.match(/^武道塔-第(.+)层$/);
                     if (r) {
@@ -1694,9 +1738,6 @@
                         kill_id = undefined;
                         lv = 0;
                     }
-                }
-                else if (data.type == "combat") {
-                    if (data.start) WG.auto_preform();
                 }
                 else if (data.type == 'text' && data.msg == '<hig>恭喜你战胜了武道塔守护者，你现在可以进入下一层。</hig>') {
                     if (lv > lv_normal) {
@@ -1768,7 +1809,6 @@
 
                         return;
                     }
-                    console.log(r);
                     if (r && state == 1) {
                         need_sm = r[2] - r[1];
                         need_fb = r[4] - r[3];
@@ -1783,23 +1823,49 @@
                         messageAppend("<hio>自动日常</hio>自动小树林" + need_fb + "次");
                         for (let i = 0; i < need_fb; i++)send_cmd("cr yz/lw/shangu;cr over");
                         send_cmd("taskover signin");
-                        setTimeout(() => {
-                            send_cmd("tasks");
-                        }, 1000);
                     }
                     else {
+                        messageAppend("<hio>自动日常</hio>出错，自动挖矿");
+                        remove_listener(h);
+                        setTimeout(() => {
+                            WG.zdwk();
+                        }, 1000);
                     }
-                    remove_listener(h);
                 }
             });
-            send_cmd("tasks");
+            send_cmd("stopstate;tasks");
             messageAppend("<hio>自动日常</hio>开始检测");
         },
+        auto_preform_switch: function () {
+            if (G.auto_preform) {
+                G.auto_preform = false;
+                messageAppend("<hio>自动施法</hio>关闭");
+                if (G.preform_timer) {
+                    clearInterval(G.preform_timer);
+                    G.preform_timer = undefined;
+                }
+
+            } else {
+                G.auto_preform = true;
+                messageAppend("<hio>自动施法</hio>开启");
+                WG.auto_preform();
+            }
+
+        },
         auto_preform: function (v) {
-            let t = setInterval(() => {
-                if (G.in_fight == false) clearInterval(t);
+            if (G.preform_timer || G.auto_preform == false) return;
+            G.preform_timer = setInterval(() => {
+                if (G.in_fight == false) {
+                    if (G.preform_timer) {
+                        clearInterval(G.preform_timer);
+                        G.preform_timer = undefined;
+                    }
+
+                }
                 for (var skill of G.skills) {
-                    if (!G.gcd && !G.cooldowns.get(skill.id)) send_cmd("perform " + skill.id);
+                    if (!G.gcd && !G.cooldowns.get(skill.id)) {
+                        send_cmd("perform " + skill.id); break;
+                    }
                 }
             }, 350);
         },
@@ -2003,6 +2069,7 @@ color: unset;resize: none;width: 80%;height: 1rem;margin-bottom: 0px;padding: 0p
         $("head").append("<link href='https://cdn.bootcss.com/jquery-contextmenu/3.0.0-beta.2/jquery.contextMenu.min.css' rel='stylesheet'>");
         $.contextMenu({
             selector: ".container",
+            autoHide: 0,
             items: {
                 "关闭自动": {
                     name: "关闭自动", visible: function (key, opt) { return WG.auto_check(); },
