@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_lib
 // @namespace    cqv
-// @version      0.0.3
+// @version      0.0.5
 // @date         8/08/2018
-// @modified     14/08/2018
+// @modified     19/08/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/371517
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -16,21 +16,21 @@
     'use strict';
 
     console.log(window.WebSocket);
-    if(window.WebSocket)
-    {
+    if (window.WebSocket) {
         var _ws = window.WebSocket, ws, ws_on_message;
         var message_listeners = [];
         var listener_seq = 0;
-        var in_array = function(val,arr){
-            if(arr instanceof Array){
-                for(var i=0;i<arr.length;i++){
-                    if(val==arr[i])return true;
-                }}
+        var in_array = function (val, arr) {
+            if (arr instanceof Array) {
+                for (var i = 0; i < arr.length; i++) {
+                    if (val == arr[i]) return true;
+                }
+            }
             return false;
         }
         function add_listener(types, fn) {
             var listener = {
-                'id' : ++listener_seq,
+                'id': ++listener_seq,
                 'types': types,
                 'fn': fn
             };
@@ -39,7 +39,7 @@
 
         }
         function remove_listener(id) {
-            for ( var i = 0; i < message_listeners.length; i++) {
+            for (var i = 0; i < message_listeners.length; i++) {
                 if (message_listeners[i].id == id) {
                     message_listeners.splice(i, 1);
                 }
@@ -48,7 +48,7 @@
         function fire_listener(data) {
             for (var i = 0; i < message_listeners.length; i++) {
                 var listener = message_listeners[i];
-                if (listener.types == data.type || in_array(data.type,listener.types) ) {
+                if (listener.types == data.type || in_array(data.type, listener.types)) {
                     listener.fn(data);
                 }
             }
@@ -128,9 +128,8 @@
                 }
             }
         };
-        function cmd_echo(b)
-        {
-            echo=b==true?true:false;
+        function cmd_echo(b) {
+            echo = b == true ? true : false;
         }
         function show_msg(msg) {
             ws_on_message({ data: msg });
@@ -143,7 +142,7 @@
         unsafeWindow.WebSocket = function (uri) {
             ws = new _ws(uri);
             console.log("武神传说websocket已捕获！");
-            document.getElementsByClassName("signinfo")[0].innerHTML="<HIR>武神传说前置插件正常运行！</HIR>"
+            document.getElementsByClassName("signinfo")[0].innerHTML = "<HIR>武神传说前置插件正常运行！</HIR>"
         };
         unsafeWindow.WebSocket.prototype = {
             CONNECTING: _ws.CONNECTING,
@@ -209,17 +208,14 @@
         unsafeWindow.add_listener = add_listener;
         unsafeWindow.remove_listener = remove_listener;
         unsafeWindow.send_cmd = send_cmd;
-        unsafeWindow.cmd_echo=cmd_echo;
+        unsafeWindow.cmd_echo = cmd_echo;
         unsafeWindow.test = my_receive_message;
     }
-    else
-    {
+    else {
         console.log("武神传说websocket捕获失败！");
-        if(document.body)
-        {
-            document.getElementsByClassName("signinfo")[0].innerHTML="<HIR>使用yandex浏览器请油猴设置为高级，实验-注入模式设置为严格</HIR>"
-       setTimeout(() => {
-                location.reload();
-            },2000); }
+        if (document.body) {
+            document.getElementsByClassName("signinfo")[0].innerHTML = "<HIR>使用yandex浏览器请油猴设置为高级，实验-注入模式设置为严格</HIR>";
+            setTimeout(() => { location.reload(); }, 2000);
         }
+    }
 })();
