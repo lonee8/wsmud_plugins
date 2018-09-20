@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.3
+// @version      1.0.4
 // @date         01/07/2018
 // @modified     19/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
@@ -455,6 +455,15 @@
             "师门令牌",
             "喜宴",
         ],
+        mpz: {
+            "武当派": { room: "武当派-三清殿", npc: "宋远桥" },
+            "华山派": { room: "华山派-客厅", npc: "岳不群" },
+            "少林派": { room: "少林派-天王殿", npc: "道觉禅师" },
+            "逍遥派": { room: "逍遥派-青草坪", npc: "苏星河" },
+            "丐帮": { room: "丐帮-树洞下", npc: "左全" },
+            "峨眉派": { room: "峨眉派-大殿", npc: "静心" },
+            "无门无派": { room: "扬州城-扬州武馆", npc: "武馆教习" },
+        },
     };
 
     //全局变量
@@ -573,10 +582,17 @@
                     //自动BOSS
 
                     if (S.auto_boss && (G.map == 'home' || G.room == 'kuang') && data.ch == 'rumor') {
-                        var r = data.content.match(/^听说(.+)出现在(.+)一带。$/);
+                        let r = data.content.match(/^听说(.+)出现在(.+)一带。$/);
                         if (r) {
                             G.stat_boss_find++;
                             WG.boss(r[1], r[2]);
+                        }
+                    }
+                    //自动门派
+                    if (S.auto_bpz && (G.map == 'home' || G.room == 'kuang') && data.ch == 'pty ') {
+                        let r = data.content.match(/^.+成员听令，即刻起开始进攻(.+)。$/);
+                        if (r) {
+                            WG.bpz(r[1]);
                         }
                     }
                 }
@@ -639,7 +655,9 @@
                 <span class="zdy-item eq1">未设置</span>
                 <span class="zdy-item eq2">未设置</span>
                 <span class="zdy-item eq3">未设置</span>
+                
                 <span class="zdy-item auto_perform" style="float:right;">自动攻击</span>
+                <span class="zdy-item cmd_echo" style="float:right;">代码</span>
                 </div>
                 <div style=" width: calc(100% - 40px);">
                 <span class="zdy-item sm_button">师门(Q)</span>
@@ -668,7 +686,7 @@
                 $(".packup").on("click", WG.packup);
                 $(".zdwk").on("click", WG.zdwk);
                 $(".auto_perform").on("click", WG.auto_preform_switch);
-
+                $(".cmd_echo").on("click", WG.cmd_echo_button);
                 $(".eq1").on("click", function () { if (G.eq1) { send_cmd(G.eq1); } else { messageAppend("未设置"); } });
                 $(".eq2").on("click", function () { if (G.eq2) { send_cmd(G.eq2); } else { messageAppend("未设置"); } });
                 $(".eq3").on("click", function () { if (G.eq3) { send_cmd(G.eq3); } else { messageAppend("未设置"); } });
@@ -679,8 +697,8 @@
                 if (S.alt == 0) document.title = G.role;
                 KEY.do_command("showtool");
                 KEY.do_command("showcombat");
-                send_cmd("score");
                 $("span[command='tasks']").click();
+                send_cmd("score");
             }, 500);
         },
         show_hp: function (id) {
@@ -723,12 +741,10 @@
             }
         },
         show_DPS: function (id, item) {
-            console.log(item);
             let s = $(".room-item[itemid=" + id + "] .item-dps");
             if (s.length == 0) {
                 s = $(".room-item[itemid=" + id + "] .item-status").after("<span class='item-dps'></span>").next();
             }
-            console.log(s);
             let html = "";
             if (item.damage) html = "<hir>DPS:" + item.damage + "(" + Math.floor(item.damage / item.max_hp * 100) + "%)</hir>";
             s.html(html);
@@ -998,9 +1014,9 @@
                             remove_listener(h);
                             send_cmd('get all from ' + data.items[i].id);
                             if (t) clearTimeout(t);
-                            WG.guaji();
                             messageAppend("<hio>自动喜宴</hio><MAG>完成</MAG>");
                             G.stat_xiyan_success++;
+                            WG.guaji();
                             break;
                         }
                     }
@@ -1023,6 +1039,141 @@
             WG.guaji_stop();
             send_cmd('stopstate;jh fam 0 start;go north;go north;go east;go up');
             messageAppend("<hio>自动喜宴</hio><MAG>开始</MAG>");
+
+        },
+        bpz: function (bpz_party) {
+            if (boss_name == "stop") {
+                if (G.kill_listener) {
+                    remove_listener(G.kill_listener);
+                }
+                WG.guaji();
+                return;
+            }
+            if (G.bpz_listener) {
+                remove_listener(G.bpz_listener);
+            }
+            let boss_id, state = 1, index = 0, paths;
+            let path2 = C.path2[boss_path];
+            let kill_time;
+            if (path2) {
+                paths = path2.split(";");
+            }
+            else {
+                paths = [];
+            }
+            boss_name = $.trim($('<body>' + boss_name + '</body>').text());
+            G.kill_listener = add_listener(['sc', 'dispfm', 'status', 'die', 'text', 'msg', "dialog", "itemremove"], function (data) {
+                if (state == 1 && data.type == 'text' && data.msg == '你要看什么？') {
+                    var id = WG.find_item(boss_name);
+                    if (id) {
+                        messageAppend("<hio>世界BOSS</hio>发现" + boss_name);
+                        send_cmd(G.eq1);
+                        kill_time = new Date().getTime();
+                        boss_id = id;
+                        state = 2;
+                    } else if (index < paths.length) {
+                        setTimeout(function () {
+                            send_cmd(paths[index++] + ';look 1');
+                        }, 200);
+                    } else {
+                        messageAppend("<hio>世界BOSS</hio>未发现" + boss_name);
+                        setTimeout(function () {
+                            WG.boss("stop");
+                        }, 1000);
+                        state = 0;
+                    }
+                } else if (state == 2 && data.type == 'dispfm') {
+                    kill_time = new Date().getTime() + data.rtime;
+                } else if (state == 2 && data.type == 'text') {
+                    var r = data.msg.match(/(.+)对著(.+)喝道：「.+！今日不是你死就是我活！」/);
+                    if (r && r[2] == boss_name) {
+                        setTimeout(function () {
+                            var t = kill_time - new Date().getTime();
+                            if (t <= 0) {
+                                send_cmd("kill " + boss_id);
+                            } else {
+                                setTimeout(function () {
+                                    send_cmd("kill " + boss_id);
+                                }, t);
+                            }
+                        }, 1000);
+                        state = 3;
+                    }
+                } else if (state == 2 && data.type == 'sc' && data.id == boss_id) {
+                    //检测boss血量
+                    let item = G.items.get(data.id);
+                    //血量低于0.95强制立马攻击
+                    if (item.hp / item.max_hp < 0.95) {
+                        send_cmd("kill " + boss_id); state = 3; return;
+                    }
+                    setTimeout(function () {
+                        var t = kill_time - new Date().getTime();
+                        if (t <= 0) {
+                            send_cmd("kill " + boss_id);
+                        } else {
+                            setTimeout(function () {
+                                send_cmd("kill " + boss_id);
+                            }, t);
+                        }
+                    }, 1000);
+                    state = 3;
+
+                } else if (state == 3 && data.type == 'text') {
+                    var fail = false;
+                    if (data.msg == '你要攻击谁？') {
+                        fail = true;
+                    } else {
+                        let r = data.msg.match(/(.+)对你拱手说道：这位.+，不知.+有何得罪之处？/);
+                        if (r && r[1] == boss_name) {
+                            fail = true;
+                        }
+                    }
+                    if (fail) {
+                        messageAppend("<hio>世界BOSS</hio>击杀BOSS失败");
+                        setTimeout(function () {
+                            WG.boss("stop");
+                        }, 1000);
+                        state = 0;
+                    }
+                } else if (state == 3 && data.type == 'status' && data.id == G.id && data.action == 'remove') {
+                    //自身状态
+                } else if (state == 3 && data.type == 'status' && data.id == boss_id && data.action == 'remove') {
+                    //boss状态
+                } else if ((state == 2 || state == 3) && data.type == 'itemremove' && data.id == boss_id) {
+                    if (G.in_fight) {
+                        //修正BOSS战斗不结束
+                        test({ data: '{type:"combat",end:1}' });
+                    }
+                    messageAppend("<hio>世界BOSS</hio>击杀BOSS完成");
+                    G.stat_boss_success++;
+                    setTimeout(function () {
+                        WG.boss("stop");
+                        state = 0;
+                    }, 5000);
+
+                } else if (state == 3 && data.type == 'dialog' && data.dialog == 'pack') {
+                    if (/^<wht>.+<\/wht>$/.test(data.name)) {
+                        send_cmd('drop ' + data.id);
+                    }
+                } else if (state > 0 && data.type == 'die') {
+                    messageAppend("<hio>自动击杀</hio>击杀失败，复活挖矿");
+                    send_cmd('relive');
+                    setTimeout(function () {
+                        send_cmd('liaoshang');
+                    }, 500);
+                    state = 4;
+                } else if (state == 4 && data.type == 'text' && data.msg == '你内力不够，无法治疗自身伤势。') {
+                    setTimeout(function () {
+                        send_cmd('liaoshang');
+                    }, 3000);
+                } else if (state == 4 && data.type == 'status' && data.id == G.id && data.action == 'remove' && data.sid == 'xuruo') {
+                    WG.boss("stop");
+                    state = 0;
+                }
+            });
+            WG.guaji_stop();
+            WG.go(boss_path);
+            send_cmd("look 1");
 
         },
         boss: function (boss_name, boss_path) {
@@ -1202,6 +1353,17 @@
             let ym_npc_id;
             let ym_index, ym_paths;
             let ym_timer;
+            let ym_normal, ym_try, ym_max;
+            let ym_level;
+            let kill_id;
+            let r = S.yamen.match(/^(\d+),(\d+),(\d+)$/);
+            if (r) {
+                ym_normal = parseInt(r[1]);
+                ym_try = parseInt(r[2]);
+                ym_max = parseInt(r[3]);
+            } else {
+                messageAppend("<hio>衙门追捕</hio>衙门设置参数错误，应为(快速环,修整环,追捕上限)"); return;
+            }
             var task_ym = function (restart) {
                 state = 0;
                 WG.go("扬州城-衙门正厅");
@@ -1215,7 +1377,7 @@
                         var id = WG.find_item("程药发");
                         if (id) {
                             ym_npc_id = id;
-                            task_ym();
+                            task_ym(restart);
                         } else {
                             messageAppend("<hio>衙门追捕</hio>未发现程药发"); WG.yamen("stop");
                         }
@@ -1227,7 +1389,6 @@
                 switch (state) {
                     case 0://任务判断
                         if (data.type == 'dialog' && data.dialog == 'tasks') {
-                            console.log(data);
                             let r;
                             for (let i = 0; i < data.items.length; i++) {
                                 if (data.items[i].id == "yamen") {
@@ -1235,11 +1396,11 @@
                                     break;
                                 }
                             }
-                            console.log(r);
                             if (r) {
                                 ym_cnt = parseInt(r[2]) + 1;
+                                ym_level = parseInt(r[3]);
                                 if (ym_cnt > 20) { WG.yamen("stop"); }
-                                else if (parseInt(r[3]) > parseInt(S.yamen_max)) { task_ym(true); }
+                                else if (ym_level > ym_max) { task_ym(true); }
                                 else {
                                     r = r[1].match(/^(.+)，据说最近在(.+)出现过，你还有.+去寻找他，$/);
                                     if (r) {
@@ -1272,7 +1433,7 @@
                         if (data.type == 'text' && data.msg == '你要看什么？') {
                             var id = WG.find_item(ym_target);
                             if (id) {
-                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务：发现" + ym_target);
+                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务（难度" + ym_level + ")：发现" + ym_target);
                                 ym_target_id = id;
                                 send_cmd("kill " + ym_target_id);
                                 state = 3;
@@ -1281,12 +1442,12 @@
                                     send_cmd(ym_paths[ym_index++] + ';look 1');
                                 }, 200);
                             } else {
-                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务：" + ym_path + "未发现" + ym_target + "，请自行查找");
+                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务（难度" + ym_level + ")：" + ym_path + "未发现" + ym_target + "，请自行查找");
                                 state = 2;
                                 if (ym_timer) clearTimeout(ym_timer);
                                 ym_timer = setTimeout(() => {
                                     if (state == 2) {
-                                        messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务：未进行手动查找");
+                                        messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务（难度" + ym_level + ")：未进行手动查找");
                                         WG.yamen("stop");
                                     }
                                 }, 20000);
@@ -1298,7 +1459,7 @@
                             console.log(data);
                             let id = WG.find_item(ym_target);
                             if (id) {
-                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务：发现" + ym_target);
+                                messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务（难度" + ym_level + ")：发现" + ym_target);
                                 ym_target_id = id;
                                 send_cmd("kill " + ym_target_id);
                                 state = 3;
@@ -1316,22 +1477,16 @@
                             //boss状态
                         } else if (data.type == 'text' && data.msg.match(/^<hig>你的追捕任务完成了，目前完成(\d+)\/(\d+)个，已连续完成(\d+)个。<\/hig>$/)) {
                             messageAppend("<hio>衙门追捕</hio>任务完成");
-                            send_cmd("dazuo");
-                            var h = setInterval(function () {
-                                //检查状态
-                                let item = G.items.get(G.id);
-                                if (item.mp / item.max_mp < 0.7) {//内力控制
-                                    if (item.state != "打坐") { send_cmd("stopstate;dazuo"); return; }
-                                }
-                                if (item.hp / item.max_hp < 1) {
-                                    //血满
-                                    if (item.state != "疗伤") { send_cmd("stopstate;liaoshang"); return; }
-                                }
-                                clearInterval(h);
-                                if (item.state) send_cmd("stopstate");
+                            console.log("ym_cnt" + ym_cnt + "ym_normal" + ym_normal + "ym_try" + ym_try);
+                            if (ym_level > ym_normal) {
+                                messageAppend("<hio>衙门追捕</hio>修整");
+                                WG.recover(1, 0.7, ym_level > ym_try, () => { send_cmd("tasks"); });
+                            }
+                            else {
                                 send_cmd("tasks");
-                            }, 1000);
+                            }
                             state = 0;
+
                         } else if (data.type == 'die') {
                             messageAppend("<hio>衙门追捕</hio>击杀失败，请设置衙门环数");
                             send_cmd('relive');
@@ -1359,16 +1514,21 @@
             $(".ym_button").text("停止(Q)");
         },
         kill_all: function () {
-            var lists = $(".room_items .room-item");
-            for (var npc of lists) {
-                send_cmd("kill " + $(npc).attr("itemid"));
+            for (let [k, v] of G.items) {
+                if (k == G.id) continue;
+                if (!v.kill) {
+                    send_cmd("kill " + k);
+                    v.kill = true;
+                }
             }
         },
 
         get_all: function () {
-            var lists = $(".room_items .room-item");
-            for (var npc of lists) {
-                send_cmd("get all from " + $(npc).attr("itemid"));
+            for (let [k, v] of G.items) {
+                if (k == G.id) continue;
+                if (v.name.match(/^(.+)的尸体$/)) {
+                    send_cmd("get all from " + k);
+                }
             }
         },
         inArray: function (val, arr) {
@@ -1544,6 +1704,7 @@
                                 messageAppend("<hio>自动修炼</hio>挖矿收益过低，返回修炼");
                                 send_cmd("stopstate");
                                 WG.go("住房-练功房");
+                                send_cmd(G.eq3);
                                 if (G.xl_skills[G.xl_index] == "dazuo") {
                                     send_cmd("stopstate;dazuo");
                                 }
@@ -1568,6 +1729,7 @@
             } else {
                 send_cmd("stopstate");
                 WG.go("住房-练功房");
+                send_cmd(G.eq3);
                 if (G.xl_skills[G.xl_index] == "dazuo") {
                     send_cmd("stopstate;dazuo");
                 }
@@ -1697,8 +1859,36 @@
             }
             return rtn + section;
         },
+        recover: function (hp, mp, cd, callback) {
+            //返回定时器
+            send_cmd("dazuo");
+            let h = setInterval(function () {
+                //检查状态
+                let item = G.items.get(G.id);
+                if (item.mp / item.max_mp < mp) {//内力控制
+                    if (item.state != "打坐") { send_cmd("stopstate;dazuo"); } return;
+                }
+                if (item.hp / item.max_hp < hp) {
+                    //血满
+                    if (item.state != "疗伤") { send_cmd("stopstate;liaoshang"); } return;
+                }
+                if (cd) {
+                    for (let [k, v] of G.cooldowns) {
+                        if (v) return;
+                    }
+                }
+                clearInterval(h);
+                if (item.state) send_cmd("stopstate");
+                callback();
+            }, 1000);
+            return h;
+        },
         wudao: function (v) {
             if (v == "stop") {
+                if (G.wd_timer) {
+                    clearInterval(G.wd_timer);
+                    G.wd_timer = undefined;
+                }
                 if (G.wd_linstener) {
                     remove_listener(G.wd_linstener);
                     G.wd_linstener = undefined;
@@ -1707,14 +1897,15 @@
             }
             if (G.wd_linstener) return;
             let lv = 0;
-            let lv_normal, lv_max;
+            let lv_normal, lv_try, lv_max;
             let kill_id;
-            let r = S.wudao.match(/^(.\d+),(.\d+)$/);
+            let r = S.wudao.match(/^(\d+),(\d+),(\d+)$/);
             if (r) {
                 lv_normal = parseInt(r[1]);
-                lv_max = parseInt(r[2]);
+                lv_try = parseInt(r[2]);
+                lv_max = parseInt(r[3]);
             } else {
-                messageAppend("<hio>自动武道</hio>武道设置参数错误，应为数字,数字(10,30)"); return;
+                messageAppend("<hio>自动武道</hio>武道设置参数错误，应为数字,数字(快速层,30,50)"); return;
             }
             G.wd_linstener = add_listener(["items", "text",], (data) => {
                 if (data.type == "items") {
@@ -1742,21 +1933,7 @@
                 else if (data.type == 'text' && data.msg == '<hig>恭喜你战胜了武道塔守护者，你现在可以进入下一层。</hig>') {
                     if (lv > lv_normal) {
                         messageAppend("<hio>自动武道</hio>修整");
-                        send_cmd("dazuo");
-                        var h = setInterval(function () {
-                            //检查状态
-                            let item = G.items.get(G.id);
-                            if (item.mp / item.max_mp < 0.7) {//内力控制
-                                if (item.state != "打坐") { send_cmd("stopstate;dazuo"); } return;
-                            }
-                            if (item.hp / item.max_hp < 1) {
-                                //血满
-                                if (item.state != "疗伤") { send_cmd("stopstate;liaoshang"); } return;
-                            }
-                            clearInterval(h);
-                            if (item.state) send_cmd("stopstate");
-                            send_cmd('go up');
-                        }, 1000);
+                        WG.recover(1, 0.7, lv > lv_try, () => { send_cmd('go up'); });
                     }
                     else {
                         setTimeout(function () {
@@ -1836,6 +2013,17 @@
             send_cmd("stopstate;tasks");
             messageAppend("<hio>自动日常</hio>开始检测");
         },
+        cmd_echo_button: function () {
+            if (G.cmd_echo) {
+                G.cmd_echo = false;
+                messageAppend("<hio>命令代码关闭</hio>");
+            }
+            else {
+                G.cmd_echo = true;
+                messageAppend("<hio>命令代码显示</hio>");
+            }
+            cmd_echo(G.cmd_echo);
+        },
         auto_preform_switch: function () {
             if (G.auto_preform) {
                 G.auto_preform = false;
@@ -1860,7 +2048,6 @@
                         clearInterval(G.preform_timer);
                         G.preform_timer = undefined;
                     }
-
                 }
                 for (var skill of G.skills) {
                     if (!G.gcd && !G.cooldowns.get(skill.id)) {
@@ -1873,7 +2060,7 @@
 
     //设置
     var S = {
-        yamen_max: 30,
+        yamen: 30,
         packup_max: 4,
         auto_xiyan: 0,
         auto_boss: 0,
@@ -1940,11 +2127,10 @@
                         case "eq3":
                         case "xl_skills":
                         case "wudao":
+                        case "yamen":
                             $("#" + i).show().val(n);
                             break;
-                        case "yamen_max":
-                            $("#" + i).show().val(parseInt(n));
-                            break;
+
                         default:
                             1 == n && (s.find(".switch2").addClass("on"), s.find(".switch-text").html("开"))
                     }
@@ -1984,13 +2170,13 @@
 </span>
 </div>
 <br>
-<div class="setting-item setting-item2" for="yamen_max" style='display: inline-block;'>
-<span class="title">追捕上限</span>
-<input class="settingbox2 hide" spellcheck="false" id="yamen_max" style='width:50px;' oninput="value=value.replace(/[^\\d]/g,'');"></input>
+<div class="setting-item setting-item2" for="yamen" style='display: inline-block;'>
+<span class="title">追捕设置</span>
+<input class="settingbox2 hide" spellcheck="false" id="yamen" style='width:120px;' ></input>
 </div>
 <div class="setting-item setting-item2" for="wudao" style='display: inline-block;'>
 <span class="title">武道设置</span>
-<input class="settingbox2 hide" spellcheck="false" id="wudao" style='width:120px;' placeholder="平A上限,停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"></input>
+<input class="settingbox2 hide" spellcheck="false" id="wudao" style='width:120px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"></input>
 </div>
 <div class="setting-item setting-item2" for="eq1">
 <span class="title">自定义装备1（日常）</span>
