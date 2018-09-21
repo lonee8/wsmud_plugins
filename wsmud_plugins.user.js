@@ -1067,7 +1067,7 @@
                     var id = WG.find_item(boss_name);
                     if (id) {
                         messageAppend("<hio>世界BOSS</hio>发现" + boss_name);
-                        send_cmd(G.eq1);
+                        $(".eq1").click();
                         kill_time = new Date().getTime();
                         boss_id = id;
                         state = 2;
@@ -1203,7 +1203,7 @@
                     var id = WG.find_item(boss_name);
                     if (id) {
                         messageAppend("<hio>世界BOSS</hio>发现" + boss_name);
-                        send_cmd(G.eq1);
+                        $(".eq1").click();
                         kill_time = new Date().getTime();
                         boss_id = id;
                         state = 2;
@@ -1704,7 +1704,7 @@
                                 messageAppend("<hio>自动修炼</hio>挖矿收益过低，返回修炼");
                                 send_cmd("stopstate");
                                 WG.go("住房-练功房");
-                                send_cmd(G.eq3);
+                                $(".eq3").click();
                                 if (G.xl_skills[G.xl_index] == "dazuo") {
                                     send_cmd("stopstate;dazuo");
                                 }
@@ -1729,7 +1729,7 @@
             } else {
                 send_cmd("stopstate");
                 WG.go("住房-练功房");
-                send_cmd(G.eq3);
+                $(".eq3").click();
                 if (G.xl_skills[G.xl_index] == "dazuo") {
                     send_cmd("stopstate;dazuo");
                 }
@@ -1943,7 +1943,7 @@
                 else if (data.type == 'text' && data.msg == '<hig>恭喜你战胜了武道塔守护者，你现在可以进入下一层。</hig>') {
                     if (lv > lv_normal) {
                         messageAppend("<hio>自动武道</hio>修整");
-                        WG.recover(1, 0.7, lv > lv_try, () => { if (G.eq1) { send_cmd(G.eq1); } send_cmd('go up'); });
+                        WG.recover(1, 0.7, lv > lv_try, () => {  $(".eq1").click(); send_cmd('go up'); });
                     }
                     else {
                         setTimeout(function () {
@@ -2052,11 +2052,13 @@
                 if (G.preform_timer) {
                     clearInterval(G.preform_timer);
                     G.preform_timer = undefined;
+                    $(".auto_perform").css("background", "");
                 }
                 return;
             }
             if (G.preform_timer || G.auto_preform == false) return;
-            G.preform_timer = setInterval(() => {
+            $(".auto_perform").css("background", "#3E0000");
+            G.preform_timer = setInterval(() => {                
                 if (G.in_fight == false) WG.auto_preform("stop");
                 for (var skill of G.skills) {
                     if (!G.gcd && !G.cooldowns.get(skill.id)) {
