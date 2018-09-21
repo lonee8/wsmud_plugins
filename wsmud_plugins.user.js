@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.5
+// @version      1.0.6
 // @date         01/07/2018
-// @modified     20/09/2018
+// @modified     21/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -543,13 +543,16 @@
                     G.items.delete(data.id);
                     WG.show_hp(data.id);
                 } else if (data.type == "sc") {
+                    let item = G.items.get(data.id);
                     if (data.hp !== undefined) {
-                        let item = G.items.get(data.id);
                         item.hp = data.hp;
                         WG.show_hp(data.id);
                         if (data.id != G.id) {
                             G.scid = data.id;    //伤害统计需要
                         }
+                    }
+                    if (data.mp !== undefined) {
+                        item.mp = data.mp;
                     }
                 }
                 else if (data.type == "text") {
@@ -626,10 +629,7 @@
                     }
                     if (data.end) {
                         G.in_fight = false;
-                        if (G.preform_timer) {
-                            clearInterval(G.preform_timer);
-                            G.preform_timer = undefined;
-                        }
+                        WG.auto_preform("stop");
                     }
                 }
             });
@@ -825,7 +825,7 @@
                                 }
                                 if (task) {
                                     if (task.type == "shop") {
-                                        messageAppend("<hio>师门任务</hio>商店购买" + item_name);
+                                        messageAppend("<hio>师门任务</hio>商店" + task.npc + "购买" + item_name);
                                         WG.go(task.room); send_cmd("look 1");
                                         state = 2;
                                     } else if (task.type == "give") {
@@ -1750,6 +1750,7 @@
             }
             if (G.wk_listener) return;
             let tiejiang_id;
+            let wk_busy = false;
             G.wk_listener = add_listener(["dialog", "text"], function (data) {
                 if (data.type == "dialog" && data.dialog == "pack") {
                     //检查是否装备铁镐
@@ -1789,8 +1790,17 @@
                     } else {
                         messageAppend("<hio>自动挖矿</hio>未发现铁匠"); WG.zdwk("remove");
                     }
-                } else if (data.type == 'text' && data.msg == '你挥着铁镐开始认真挖矿。') {
-                    WG.zdwk("remove");
+                } else if (data.type == 'text') {
+                    if (data.msg == '你挥着铁镐开始认真挖矿。') WG.zdwk("remove");
+                    else if ((data.msg == "你现在正忙。" || data.msg == "你正在战斗，待会再说。") && wk_busy == false) {
+                        wk_busy = true;
+
+                        setTimeout(() => {
+                            wk_busy = false;
+                            send_cmd("stopstate;pack");
+                        }, 5000);
+                    }
+
                 }
                 if (data.type == 'dialog' && data.dialog == 'list' && data.seller == tiejiang_id) {
                     let item_id;
@@ -1933,7 +1943,7 @@
                 else if (data.type == 'text' && data.msg == '<hig>恭喜你战胜了武道塔守护者，你现在可以进入下一层。</hig>') {
                     if (lv > lv_normal) {
                         messageAppend("<hio>自动武道</hio>修整");
-                        WG.recover(1, 0.7, lv > lv_try, () => { send_cmd('go up'); });
+                        WG.recover(1, 0.7, lv > lv_try, () => { if (G.eq1) { send_cmd(G.eq1); } send_cmd('go up'); });
                     }
                     else {
                         setTimeout(function () {
@@ -2028,10 +2038,7 @@
             if (G.auto_preform) {
                 G.auto_preform = false;
                 messageAppend("<hio>自动施法</hio>关闭");
-                if (G.preform_timer) {
-                    clearInterval(G.preform_timer);
-                    G.preform_timer = undefined;
-                }
+                WG.auto_preform("stop");
 
             } else {
                 G.auto_preform = true;
@@ -2041,14 +2048,16 @@
 
         },
         auto_preform: function (v) {
+            if (v == "stop") {
+                if (G.preform_timer) {
+                    clearInterval(G.preform_timer);
+                    G.preform_timer = undefined;
+                }
+                return;
+            }
             if (G.preform_timer || G.auto_preform == false) return;
             G.preform_timer = setInterval(() => {
-                if (G.in_fight == false) {
-                    if (G.preform_timer) {
-                        clearInterval(G.preform_timer);
-                        G.preform_timer = undefined;
-                    }
-                }
+                if (G.in_fight == false) WG.auto_preform("stop");
                 for (var skill of G.skills) {
                     if (!G.gcd && !G.cooldowns.get(skill.id)) {
                         send_cmd("perform " + skill.id); break;
