@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.6
+// @version      1.0.8
 // @date         01/07/2018
 // @modified     21/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
@@ -194,7 +194,7 @@
             "少林派": { room: "少林派-天王殿", npc: "道觉禅师" },
             "逍遥派": { room: "逍遥派-青草坪", npc: "苏星河" },
             "丐帮": { room: "丐帮-树洞下", npc: "左全" },
-            "峨眉派": { room: "峨眉派-大殿", npc: "静心" },
+            "峨嵋派": { room: "峨眉派-大殿", npc: "静心" },
             "无门无派": { room: "扬州城-扬州武馆", npc: "武馆教习" },
         },
         path: {
@@ -515,7 +515,7 @@
                                 n = n.substr(i + 1).replace(/<.*>/g, '');
                             }
 
-                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp, damage: 0 });
+                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp, p:item.p,damage: 0 });
                         }
 
                     }
@@ -535,7 +535,7 @@
                             }
                             n = n.substr(i + 1).replace(/<.*>/g, '');
                         }
-                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp, damage: 0 });
+                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp, p:data.p, damage: 0 });
                     }
                     WG.show_hp(data.id);
                 }
@@ -557,14 +557,14 @@
                 }
                 else if (data.type == "text") {
                     if (G.in_fight) {
-                        let text = $.trim($('<body>' + data.msg + '</body>').text());
-                        let r = text.match(/造成(\d+)点(伤害|暴击伤害)/);
-                        if (r) {
+                        let dps_index1 = data.msg.indexOf("造成");
+                        if (dps_index1 >= 0) {
+                            let dps_index2 = data.msg.indexOf("/", dps_index1);
                             let item = G.items.get(G.scid);
                             if (item) {
-                                item.damage += parseInt(r[1]);
+                                item.damage += parseInt(data.msg.slice(dps_index1 + 7, dps_index2 - 1));
                                 WG.show_DPS(G.scid, item);
-                            }
+                            }                            
                         }
                     }
                 }
@@ -1516,10 +1516,7 @@
         kill_all: function () {
             for (let [k, v] of G.items) {
                 if (k == G.id) continue;
-                if (!v.kill) {
-                    send_cmd("kill " + k);
-                    v.kill = true;
-                }
+                send_cmd("kill " + k);
             }
         },
 
@@ -1943,7 +1940,7 @@
                 else if (data.type == 'text' && data.msg == '<hig>恭喜你战胜了武道塔守护者，你现在可以进入下一层。</hig>') {
                     if (lv > lv_normal) {
                         messageAppend("<hio>自动武道</hio>修整");
-                        WG.recover(1, 0.7, lv > lv_try, () => {  $(".eq1").click(); send_cmd('go up'); });
+                        WG.recover(1, 0.7, lv > lv_try, () => { $(".eq1").click(); send_cmd('go up'); });
                     }
                     else {
                         setTimeout(function () {
@@ -2058,7 +2055,7 @@
             }
             if (G.preform_timer || G.auto_preform == false) return;
             $(".auto_perform").css("background", "#3E0000");
-            G.preform_timer = setInterval(() => {                
+            G.preform_timer = setInterval(() => {
                 if (G.in_fight == false) WG.auto_preform("stop");
                 for (var skill of G.skills) {
                     if (!G.gcd && !G.cooldowns.get(skill.id)) {
@@ -2071,7 +2068,7 @@
 
     //设置
     var S = {
-        yamen: 30,
+        yamen: "",
         packup_max: 4,
         auto_xiyan: 0,
         auto_boss: 0,
@@ -2079,7 +2076,7 @@
         eq1: "",
         eq2: "",
         eq3: "",
-        wudao: "10,20",
+        wudao: "",
         drop_list: [],
         fenjie_list: [],
         item_hp: 0,
@@ -2101,11 +2098,10 @@
                         let tmp = t.split(":");
                         if (tmp.length == 2) {
                             $("." + e).text(tmp[0]);
-                            G[e] = tmp[1];
+                            G[e] = tmp[1].replace(/,/g, ";");
                         }
                     }
                     break;
-
                 case "item_hp":
                     WG.show_hp();
                     break;
@@ -2183,23 +2179,23 @@
 <br>
 <div class="setting-item setting-item2" for="yamen" style='display: inline-block;'>
 <span class="title">追捕设置</span>
-<input class="settingbox2 hide" spellcheck="false" id="yamen" style='width:120px;' ></input>
+<input class="settingbox2 hide" spellcheck="false" id="yamen" style='width:200px;' placeholder="快速上限,修整上限，重置上限"></input>
 </div>
 <div class="setting-item setting-item2" for="wudao" style='display: inline-block;'>
 <span class="title">武道设置</span>
-<input class="settingbox2 hide" spellcheck="false" id="wudao" style='width:120px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"></input>
+<input class="settingbox2 hide" spellcheck="false" id="wudao" style='width:200px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"></input>
 </div>
-<div class="setting-item setting-item2" for="eq1">
+<div class="setting-item setting-item2" for="eq1" >
 <span class="title">自定义装备1（日常）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq1" placeholder="标签:指令"></input>
+<input class="settingbox2 hide" spellcheck="false" id="eq1" placeholder="标签:代码1,代码2……"></input>
 </div>
-<div class="setting-item setting-item2" for="eq2">
+<div class="setting-item setting-item2" for="eq2" >
 <span class="title">自定义装备2（刀法）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq2" placeholder="标签:指令"></input>
+<input class="settingbox2 hide" spellcheck="false" id="eq2" placeholder="标签:代码1,代码2……"></input>
 </div>
-<div class="setting-item setting-item2" for="eq3">
+<div class="setting-item setting-item2" for="eq3" >
 <span class="title">自定义装备3（练习）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq3" placeholder="标签:指令"></input>
+<input class="settingbox2 hide" spellcheck="false" id="eq3" placeholder="标签:代码1,代码2……"></input>
 </div>
 <div class="setting-item setting-item2" for="xl_skills">
 <span class="title">修炼列表</span><br>
