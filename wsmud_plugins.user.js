@@ -1711,7 +1711,7 @@
                             }
                         }
                     }
-                } else if (data.type == 'msg' && data.ch == 'sys' && G.map == "home " && !G.xiulian_now) {
+                } else if (data.type == 'msg' && data.ch == 'sys' && G.map == "home" && !G.xiulian_now) {
                     let r = data.content.match(/^(.+)捡到一本挖矿指南，学会了里面记载的挖矿技巧，所有人的挖矿效率都提高了。$/);
                     if (G.xl_skills.length && r) {
                         //挖矿指南，前往挖矿
