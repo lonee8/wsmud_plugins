@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.8
+// @version      1.0.10
 // @date         01/07/2018
-// @modified     21/09/2018
+// @modified     25/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
 // @description  武神传说 MUD
 // @author       fjcqv
@@ -450,6 +450,8 @@
             "<hig>黑虎单刀</hig>",
             "<hig>员外披肩</hig>",
             "<hig>短衣劲装</hig>",
+            "<hig>拂尘</hig>",
+            "<hic>将军剑</hic>",
             "进阶残页",
             "聚气丹",
             "师门令牌",
@@ -477,9 +479,10 @@
         stat_boss_find: 0,
         stat_xiyan_success: 0,
         stat_xiyan_find: 0,
-        cooldowns: new Map(),
+        cds: new Map(),
         in_fight: false,
         auto_preform: true,
+        can_auto: false,
     };
 
     var WG = {
@@ -495,6 +498,11 @@
                     let tmp = data.path.split("/");
                     G.map = tmp[0];
                     G.room = tmp[1];
+                    if (G.map == 'home' || G.room == 'kuang')
+                        G.can_auto = true;
+                    else
+                        G.can_auto = false;
+
                     G.room_name = data.name;
                 }
                 else if (data.type == "items") {
@@ -515,7 +523,7 @@
                                 n = n.substr(i + 1).replace(/<.*>/g, '');
                             }
 
-                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp, p:item.p,damage: 0 });
+                            G.items.set(item.id, { name: n, title: t, state: s, max_hp: item.max_hp, max_mp: item.max_mp, hp: item.hp, mp: item.mp, p: item.p, damage: 0 });
                         }
 
                     }
@@ -535,7 +543,7 @@
                             }
                             n = n.substr(i + 1).replace(/<.*>/g, '');
                         }
-                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp, p:data.p, damage: 0 });
+                        G.items.set(data.id, { name: n, title: t, state: s, max_hp: data.max_hp, max_mp: data.max_mp, hp: data.hp, mp: data.mp, p: data.p, damage: 0 });
                     }
                     WG.show_hp(data.id);
                 }
@@ -564,7 +572,7 @@
                             if (item) {
                                 item.damage += parseInt(data.msg.slice(dps_index1 + 7, dps_index2 - 1));
                                 WG.show_DPS(G.scid, item);
-                            }                            
+                            }
                         }
                     }
                 }
@@ -577,14 +585,14 @@
                 }
                 else if (data.type == 'msg') {
                     //自动喜宴
-                    if (S.auto_xiyan && (G.map == 'home' || G.room == 'kuang') && data.ch == 'sys'
+                    if (S.auto_xiyan && G.can_auto && data.ch == 'sys'
                         && /^(.+)和(.+)于今日大婚，在醉仙楼大摆宴席，婚礼将在一分钟后开始。$/.test(data.content)) {
                         G.stat_xiyan_find++;
                         WG.xiyan();
                     }
                     //自动BOSS
 
-                    if (S.auto_boss && (G.map == 'home' || G.room == 'kuang') && data.ch == 'rumor') {
+                    if (S.auto_boss && G.can_auto && data.ch == 'rumor') {
                         let r = data.content.match(/^听说(.+)出现在(.+)一带。$/);
                         if (r) {
                             G.stat_boss_find++;
@@ -592,7 +600,7 @@
                         }
                     }
                     //自动门派
-                    if (S.auto_bpz && (G.map == 'home' || G.room == 'kuang') && data.ch == 'pty ') {
+                    if (S.auto_bpz && G.can_auto && data.ch == 'pty ') {
                         let r = data.content.match(/^.+成员听令，即刻起开始进攻(.+)。$/);
                         if (r) {
                             WG.bpz(r[1]);
@@ -605,10 +613,10 @@
                 else if (data.type == 'dispfm') {
                     if (data.id) {
                         if (data.distime) { }
-                        G.cooldowns.set(data.id, true);
+                        G.cds.set(data.id, true);
                         var _id = data.id;
                         setTimeout(function () {
-                            G.cooldowns.set(_id, false);
+                            G.cds.set(_id, false);
                         }, data.distime);
                     }
                     if (data.rtime) {
@@ -1021,7 +1029,8 @@
                         }
                     }
                 } else if (data.type == 'text') {
-                    if (/^店小二拦住你说道：这位(.+)，不好意思，婚宴宾客已经太多了。$/.test(data.msg)) {
+                    if (/^店小二拦住你说道：这位(.+)，不好意思，婚宴宾客已经太多了。$/.test(data.msg) ||
+                        /^店小二拦住你说道：怎么又是你，每次都跑这么快，等下再进去。$/.test(data.msg)) {
                         messageAppend("<hio>自动喜宴</hio><MAG>失败</MAG>");
                         remove_listener(h);
                         if (t) clearTimeout(t);
@@ -1531,9 +1540,9 @@
         inArray: function (val, arr) {
             for (let i = 0; i < arr.length; i++) {
                 let item = arr[i];
+                if(item.length<2)continue;
                 if (item[0] == "<") {
                     if (item == val) return true;
-
                 }
                 else {
                     if (val.indexOf(item) >= 0) return true;
@@ -1570,8 +1579,10 @@
                         }
                     }
 
-                } else if (data.type == "dialog" && data.dialog == "pack") {
+                } else if (data.type == "dialog" && data.dialog == "pack" && data.items) {
                     let cmds = [];
+                    let drop_list=S.drop_list==""?[]:S.drop_list.split(",");
+                    let fenjie_list=S.fenjie_list==""?[]:S.fenjie_list.split(",");
                     for (var i = 0; i < data.items.length; i++) {
                         //仓库
                         if (WG.inArray(data.items[i].name, C.store_list)) {
@@ -1604,14 +1615,15 @@
                                 messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "储存到仓库");
                             }
                         }
-                        //丢弃
-                        if (WG.inArray(data.items[i].name, S.drop_list)) {
+                        //丢弃                       
+                        if (drop_list.length && WG.inArray(data.items[i].name, drop_list)) {
                             cmds.push("drop " + data.items[i].count + " " + data.items[i].id);
                             messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "丢弃");
 
                         }
-                        //分解
-                        if (WG.inArray(data.items[i].name, S.fenjie_list)) {
+                        //分解，2级强化以上不分解                       
+                        if (fenjie_list.length && WG.inArray(data.items[i].name, fenjie_list) && data.items[i].name.indexOf("★")==-1) {
+
                             cmds.push("fenjie " + data.items[i].id);
                             messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "分解");
 
@@ -1880,7 +1892,8 @@
                     if (item.state != "疗伤") { send_cmd("stopstate;liaoshang"); } return;
                 }
                 if (cd) {
-                    for (let [k, v] of G.cooldowns) {
+                    for (let [k, v] of G.cds) {
+                        if (k == "force.tu") continue;
                         if (v) return;
                     }
                 }
@@ -2058,7 +2071,7 @@
             G.preform_timer = setInterval(() => {
                 if (G.in_fight == false) WG.auto_preform("stop");
                 for (var skill of G.skills) {
-                    if (!G.gcd && !G.cooldowns.get(skill.id)) {
+                    if (!G.gcd && !G.cds.get(skill.id)) {
                         send_cmd("perform " + skill.id); break;
                     }
                 }
@@ -2077,8 +2090,8 @@
         eq2: "",
         eq3: "",
         wudao: "",
-        drop_list: [],
-        fenjie_list: [],
+        drop_list: "",
+        fenjie_list: "",
         item_hp: 0,
         alt: 0,
         load: function (e) {
@@ -2109,8 +2122,6 @@
                     if (t) document.title = G.role + "【小号】";
                     else document.title = G.role;
                     break;
-                case "auto_boss":
-                    break;
             }
         },
         save: function (e, t) {
@@ -2135,75 +2146,60 @@
                         case "xl_skills":
                         case "wudao":
                         case "yamen":
+                        case "drop_list":
+                        case "fenjie_list":
                             $("#" + i).show().val(n);
                             break;
-
                         default:
                             1 == n && (s.find(".switch2").addClass("on"), s.find(".switch-text").html("开"))
                     }
                 }
             }
         },
+        html_switch: function (prop, title) {
+            return `
+            <div class="setting-item setting-item2 " for="${prop}" style='display: inline-block;'>
+            <span class="title"> ${title}</span>
+            <span class="switch2">
+            <span class="switch-button"></span>
+            <span class="switch-text">关</span>
+            </span>
+            </div>
+            `;
+        },
+        html_input: function (prop, title, attr) {
+            return `
+            <div class="setting-item setting-item2" for="${prop}" >
+            <span class="title"> ${title}</span>
+            <input class="settingbox2 hide" spellcheck="false" id="${prop}"  ${attr}></input>
+            </div>
+            `;
+        },
+        html_textarea: function (prop, title, attr) {
+            return `
+            <div class="setting-item setting-item2" for="${prop}">
+            <span class="title"> ${title}</span><br>
+            <textarea class="settingbox2 hide" spellcheck="false" id="${prop}"  ${attr}></textarea>
+            </div>
+            `;
+        },
         html: function () {
             if ($(".WG_setting").length) return;
-            var setting_html = `
-<h3 class="WG_setting">插件设置</h3>
-<div class="setting-item setting-item2 " for="auto_xiyan" style='display: inline-block;'>
-<span class="title"> 自动喜宴</span>
-<span class="switch2">
-<span class="switch-button"></span>
-<span class="switch-text">关</span>
-</span>
-</div>
-<div class="setting-item setting-item2" for="auto_boss" style='display: inline-block;'>
-<span class="title">自动BOSS</span>
-<span class="switch2">
-<span class="switch-button"></span>
-<span class="switch-text">关</span>
-</span>
-</div>
-<div class="setting-item setting-item2" for="item_hp" style='display: inline-block;'>
-<span class="title">显血开关</span>
-<span class="switch2">
-<span class="switch-button"></span>
-<span class="switch-text">关</span>
-</span>
-</div>
-<div class="setting-item setting-item2" for="alt" style='display: inline-block;'>
-<span class="title">小号设置</span>
-<span class="switch2">
-<span class="switch-button"></span>
-<span class="switch-text">关</span>
-</span>
-</div>
-<br>
-<div class="setting-item setting-item2" for="yamen" style='display: inline-block;'>
-<span class="title">追捕设置</span>
-<input class="settingbox2 hide" spellcheck="false" id="yamen" style='width:200px;' placeholder="快速上限,修整上限，重置上限"></input>
-</div>
-<div class="setting-item setting-item2" for="wudao" style='display: inline-block;'>
-<span class="title">武道设置</span>
-<input class="settingbox2 hide" spellcheck="false" id="wudao" style='width:200px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"></input>
-</div>
-<div class="setting-item setting-item2" for="eq1" >
-<span class="title">自定义装备1（日常）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq1" placeholder="标签:代码1,代码2……"></input>
-</div>
-<div class="setting-item setting-item2" for="eq2" >
-<span class="title">自定义装备2（刀法）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq2" placeholder="标签:代码1,代码2……"></input>
-</div>
-<div class="setting-item setting-item2" for="eq3" >
-<span class="title">自定义装备3（练习）</span>
-<input class="settingbox2 hide" spellcheck="false" id="eq3" placeholder="标签:代码1,代码2……"></input>
-</div>
-<div class="setting-item setting-item2" for="xl_skills">
-<span class="title">修炼列表</span><br>
-<textarea class="settingbox2 hide" spellcheck="false" id="xl_skills" style='width:90%;height:2.5rem;'></textarea>
-</div>
-<button class="setting-save">保存插件设置</button>
-<h3>原设置</h3>
-`;
+            var setting_html = "<h3 class='WG_setting'>插件设置</h3>" +
+                this.html_switch("auto_xiyan", "自动喜宴") +
+                this.html_switch("auto_boss", "自动BOSS") +
+                this.html_switch("item_hp", "显血开关") +
+                this.html_switch("alt", "小号设置") +
+                "<br>" +
+                this.html_input("yamen", "追捕设置", `style='width:200px;' placeholder="快速上限,修整上限，重置上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`) +
+                this.html_input("wudao", "武道设置", `style='width:200px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`) +
+                this.html_input("eq1", "自定义装备1（日常）", `placeholder="标签:代码1,代码2……"`) +
+                this.html_input("eq2", "自定义装备2（日常）", `placeholder="标签:代码1,代码2……"`) +
+                this.html_input("eq3", "自定义装备3（日常）", `placeholder="标签:代码1,代码2……"`) +
+                this.html_textarea("xl_skills", "修炼列表", `style='width:90%;height:2.5rem;'`) +
+                this.html_textarea("drop_list", "整理丢弃清单", `style='width:90%;height:2.5rem;' placeholder="物品1,物品2……(注意，这边的丢弃没有提示)"`) +
+                this.html_textarea("fenjie_list", "整理分解清单", `style='width:90%;height:2.5rem;' placeholder="物品1,物品2……(注意，这边的分解没有提示，2级强化的物品不会分解)"`) +
+                "<button class='setting-save'>保存插件设置</button><h3>原设置</h3>";
             $(".dialog-custom").prepend(setting_html);
             let css = `.setting > .setting-save {border:1px solid gray;background-color:transparent;color:unset;
 width:7rem;height:1.7rem;margin-left: 0.625em;}
