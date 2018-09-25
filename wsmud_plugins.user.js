@@ -1621,9 +1621,14 @@
                             messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "丢弃");
 
                         }
+<<<<<<< HEAD
                         //分解，2级强化以上不分解                       
                         if (fenjie_list.length && WG.inArray(data.items[i].name, fenjie_list) && data.items[i].name.indexOf("★")==-1) {
 
+=======
+                        //分解                        
+                        if (fenjie_list.length && WG.inArray(data.items[i].name, fenjie_list)) {
+>>>>>>> e92d4614ee703d803cbe2002ce8f1c570c83349d
                             cmds.push("fenjie " + data.items[i].id);
                             messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "分解");
 
@@ -2197,8 +2202,13 @@
                 this.html_input("eq2", "自定义装备2（日常）", `placeholder="标签:代码1,代码2……"`) +
                 this.html_input("eq3", "自定义装备3（日常）", `placeholder="标签:代码1,代码2……"`) +
                 this.html_textarea("xl_skills", "修炼列表", `style='width:90%;height:2.5rem;'`) +
+<<<<<<< HEAD
                 this.html_textarea("drop_list", "整理丢弃清单", `style='width:90%;height:2.5rem;' placeholder="物品1,物品2……(注意，这边的丢弃没有提示)"`) +
                 this.html_textarea("fenjie_list", "整理分解清单", `style='width:90%;height:2.5rem;' placeholder="物品1,物品2……(注意，这边的分解没有提示，2级强化的物品不会分解)"`) +
+=======
+                this.html_textarea("drop_list", "整理丢弃清单", `style='width:90%;height:2.5rem;'`) +
+                this.html_textarea("fenjie_list", "整理分解清单", `style='width:90%;height:2.5rem;'`) +
+>>>>>>> e92d4614ee703d803cbe2002ce8f1c570c83349d
                 "<button class='setting-save'>保存插件设置</button><h3>原设置</h3>";
             $(".dialog-custom").prepend(setting_html);
             let css = `.setting > .setting-save {border:1px solid gray;background-color:transparent;color:unset;
