@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         wsmud_plugins
 // @namespace    cqv
-// @version      1.0.10
+// @version      1.0.11
 // @date         01/07/2018
-// @modified     25/09/2018
+// @modified     26/09/2018
 // @homepage     https://greasyfork.org/zh-CN/scripts/370135
 // @description  武神传说 MUD
 // @author       fjcqv
 // @match        http://game.wsmud.com/*
 // @require      https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js
+// @require      https://cdn.bootcss.com/jqueryui/1.12.1/jquery-ui.js
 // @require      https://cdn.bootcss.com/jquery-contextmenu/3.0.0-beta.2/jquery.contextMenu.min.js
+
 // @grant        unsafeWindow
 // @grant        GM_addStyle
 // @grant        GM_getValue
@@ -201,7 +203,8 @@
             "住房": "jh fam 0 start;go west;go west;go north;go enter",
             "住房-小花园": "jh fam 0 start;go west;go west;go north;go enter;go northeast",
             "住房-练功房": "jh fam 0 start;go west;go west;go north;go enter;go west",
-            "扬州城-钱庄": "jh fam 0 start;go north;go west;",
+            "扬州城-钱庄": "jh fam 0 start;go north;go west",
+            "扬州城-武庙": "jh fam 0 start;go north;go north;go west",
             "扬州城-醉仙楼": "jh fam 0 start;go north;go north;go east",
             "扬州城-杂货铺": "jh fam 0 start;go east;go south",
             "扬州城-打铁铺": "jh fam 0 start;go east;go east;go south",
@@ -212,7 +215,7 @@
             "扬州城-当铺": "jh fam 0 start;go south;go east",
             "扬州城-帮派": "jh fam 0 start;go south;go south;go east",
             "扬州城-扬州武馆": "jh fam 0 start;go south;go south;go west",
-            "武当派-广场": "jh fam 1 start;",
+            "武当派-广场": "jh fam 1 start",
             "武当派-三清殿": "jh fam 1 start;go north",
             "武当派-石阶": "jh fam 1 start;go west",
             "武当派-练功房": "jh fam 1 start;go west;go west",
@@ -226,9 +229,9 @@
             "武当派-朝天宫": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north",
             "武当派-三天门": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north;go north",
             "武当派-紫金城": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north;go north;go north",
-            "武当派-林间小径": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north;go north;go north;go north;",
+            "武当派-林间小径": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north;go north;go north;go north",
             "武当派-后山小院": "jh fam 1 start;go west;go northup;go north;go west;go northup;go northup;go northup;go north;go north;go north;go north;go north;go north",
-            "少林派-广场": "jh fam 2 start;",
+            "少林派-广场": "jh fam 2 start",
             "少林派-山门殿": "jh fam 2 start;go north",
             "少林派-东侧殿": "jh fam 2 start;go north;go east",
             "少林派-西侧殿": "jh fam 2 start;go north;go west",
@@ -246,7 +249,7 @@
             "少林派-竹林": "jh fam 2 start;go north;go north;go northwest;go northeast;go north;go north;go north",
             "少林派-藏经阁": "jh fam 2 start;go north;go north;go northwest;go northeast;go north;go north;go north;go west",
             "少林派-达摩洞": "jh fam 2 start;go north;go north;go northwest;go northeast;go north;go north;go north;go north;go north",
-            "华山派-镇岳宫": "jh fam 3 start;",
+            "华山派-镇岳宫": "jh fam 3 start",
             "华山派-苍龙岭": "jh fam 3 start;go eastup",
             "华山派-舍身崖": "jh fam 3 start;go eastup;go southup",
             "华山派-峭壁": "jh fam 3 start;go eastup;go southup;jumpdown",
@@ -485,6 +488,18 @@
         can_auto: false,
     };
 
+    var storage = {
+        set(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        },
+        get(key) {
+            return JSON.parse(localStorage.getItem(key));
+        },
+        remove(key) {
+            localStorage.removeItem(key);
+        }
+    };
+
     var WG = {
         sm_state: -1,
         sm_item: null,
@@ -670,7 +685,7 @@
                 <div style=" width: calc(100% - 40px);">
                 <span class="zdy-item sm_button">师门(Q)</span>
                 <span class="zdy-item ym_button">追捕(W)</span>
-                <span class="zdy-item kill_all">击杀(E)</span>
+                <span class="zdy-item kill_all">叫杀(E)</span>
                 <span class="zdy-item get_all">拾取(R)</span>
                 <span class="zdy-item packup">整理(T)</span>
                 <span class="zdy-item zdwk">挖矿(Y)</span>
@@ -821,7 +836,6 @@
                 switch (state) {
                     case 0://任务判断
                         if (data.type == "cmds") {
-
                             if (data.items[0].cmd.indexOf("task sm") > -1) {
                                 for (let i = 0; i < data.items.length; i++) {
                                     let item = data.items[i];
@@ -1465,7 +1479,6 @@
                         break;
                     case 2:// 自动失效，进入手动阶段，超时追捕失败
                         if (data.type == "items") {
-                            console.log(data);
                             let id = WG.find_item(ym_target);
                             if (id) {
                                 messageAppend("<hio>衙门追捕</hio>" + ym_cnt + "环任务（难度" + ym_level + ")：发现" + ym_target);
@@ -1486,9 +1499,9 @@
                             //boss状态
                         } else if (data.type == 'text' && data.msg.match(/^<hig>你的追捕任务完成了，目前完成(\d+)\/(\d+)个，已连续完成(\d+)个。<\/hig>$/)) {
                             messageAppend("<hio>衙门追捕</hio>任务完成");
-                            console.log("ym_cnt" + ym_cnt + "ym_normal" + ym_normal + "ym_try" + ym_try);
                             if (ym_level > ym_normal) {
                                 messageAppend("<hio>衙门追捕</hio>修整");
+                                WG.go("扬州城-武庙");
                                 WG.recover(1, 0.7, ym_level > ym_try, () => { send_cmd("tasks"); });
                             }
                             else {
@@ -1525,7 +1538,14 @@
         kill_all: function () {
             for (let [k, v] of G.items) {
                 if (k == G.id) continue;
-                send_cmd("kill " + k);
+                if(v.max_hp>S.kill_maxHp)continue;
+                if (v.p) {
+                    if (S.kill_player)
+                        send_cmd("kill " + k);
+                } else {
+                    send_cmd("kill " + k);
+                }
+
             }
         },
 
@@ -1540,7 +1560,7 @@
         inArray: function (val, arr) {
             for (let i = 0; i < arr.length; i++) {
                 let item = arr[i];
-                if(item.length<2)continue;
+                if (item.length < 2) continue;
                 if (item[0] == "<") {
                     if (item == val) return true;
                 }
@@ -1581,8 +1601,8 @@
 
                 } else if (data.type == "dialog" && data.dialog == "pack" && data.items) {
                     let cmds = [];
-                    let drop_list=S.drop_list==""?[]:S.drop_list.split(",");
-                    let fenjie_list=S.fenjie_list==""?[]:S.fenjie_list.split(",");
+                    let drop_list = S.drop_list == "" ? [] : S.drop_list.split(",");
+                    let fenjie_list = S.fenjie_list == "" ? [] : S.fenjie_list.split(",");
                     for (var i = 0; i < data.items.length; i++) {
                         //仓库
                         if (WG.inArray(data.items[i].name, C.store_list)) {
@@ -1622,7 +1642,7 @@
 
                         }
                         //分解，2级强化以上不分解                       
-                        if (fenjie_list.length && WG.inArray(data.items[i].name, fenjie_list) && data.items[i].name.indexOf("★")==-1) {
+                        if (fenjie_list.length && WG.inArray(data.items[i].name, fenjie_list) && data.items[i].name.indexOf("★") == -1) {
                             cmds.push("fenjie " + data.items[i].id);
                             messageAppend("<hio>包裹整理</hio>" + data.items[i].name + "分解");
 
@@ -1970,7 +1990,7 @@
                 WG.todo(function () {
                     var id = WG.find_item("守门人");
                     if (id) {
-                        send_cmd("ask1 " + id + ";go enter;");
+                        send_cmd("ask1 " + id + ";go enter");
                     } else {
                         messageAppend("<hio>自动武道</hio>未发现守门人"); WG.wudao("stop");
                     }
@@ -2093,6 +2113,8 @@
         fenjie_list: "",
         item_hp: 0,
         alt: 0,
+        kill_player: 0,
+        kill_maxHp:39999999,
         load: function (e) {
             if (e) for (var t in e) (this[t] == undefined || (this.set_prop(t, e[t]), this[t] = e[t]));
         },
@@ -2147,6 +2169,7 @@
                         case "yamen":
                         case "drop_list":
                         case "fenjie_list":
+                        case "kill_maxHp":
                             $("#" + i).show().val(n);
                             break;
                         default:
@@ -2166,9 +2189,9 @@
             </div>
             `;
         },
-        html_input: function (prop, title, attr) {
+        html_input: function (prop, title, attr, br) {
             return `
-            <div class="setting-item setting-item2" for="${prop}" >
+            <div class="setting-item setting-item2" for="${prop}" ${br ? "style='display: inline-block;'" : ""} >
             <span class="title"> ${title}</span>
             <input class="settingbox2 hide" spellcheck="false" id="${prop}"  ${attr}></input>
             </div>
@@ -2188,10 +2211,12 @@
                 this.html_switch("auto_xiyan", "自动喜宴") +
                 this.html_switch("auto_boss", "自动BOSS") +
                 this.html_switch("item_hp", "显血开关") +
+                this.html_switch("kill_player", "叫杀玩家") +
                 this.html_switch("alt", "小号设置") +
                 "<br>" +
-                this.html_input("yamen", "追捕设置", `style='width:200px;' placeholder="快速上限,修整上限，重置上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`) +
-                this.html_input("wudao", "武道设置", `style='width:200px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`) +
+                this.html_input("kill_maxHp", "叫杀限制", `style='width:80px;' placeholder="叫杀血量限制" oninput="value=value.replace(/[^\\d]/g,'');"`, true) +                
+                this.html_input("yamen", "追捕设置", `style='width:200px;' placeholder="快速上限,修整上限，重置上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`, true) +
+                this.html_input("wudao", "武道设置", `style='width:200px;' placeholder="快速上限,修整上限，停止上限" oninput="value=value.replace(/[^\\d\\,]/g,'');"`, true) +
                 this.html_input("eq1", "自定义装备1（日常）", `placeholder="标签:代码1,代码2……"`) +
                 this.html_input("eq2", "自定义装备2（日常）", `placeholder="标签:代码1,代码2……"`) +
                 this.html_input("eq3", "自定义装备3（日常）", `placeholder="标签:代码1,代码2……"`) +
@@ -2277,6 +2302,7 @@ color: unset;resize: none;width: 80%;height: 1rem;margin-bottom: 0px;padding: 0p
                     "items": {
                         "kj0": { name: "豪宅", callback: function (key, opt) { WG.go("住房"); }, },
                         "kj1": { name: "仓库", callback: function (key, opt) { WG.go("扬州城-钱庄"); send_cmd("store") }, },
+                        "kj1": { name: "武庙", callback: function (key, opt) { WG.go("扬州城-武庙"); send_cmd("store") }, },
                         "kj2": { name: "衙门", callback: function (key, opt) { WG.go("扬州城-衙门正厅"); }, },
                         "kj3": { name: "帮派", callback: function (key, opt) { WG.go("扬州城-帮派"); }, },
                         "kj4": { name: "擂台", callback: function (key, opt) { WG.go("扬州城-擂台"); }, },
